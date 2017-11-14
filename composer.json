@@ -1,0 +1,8 @@
+{
+    "name": "mautic/redis-counting-semaphore",
+    "description": "Counting semaphore implementation using redis as a backend",
+    "type": "library",
+    "require": {
+        "predis/predis": "^1.1"
+    }
+}
