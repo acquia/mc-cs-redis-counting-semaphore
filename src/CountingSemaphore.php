@@ -14,13 +14,13 @@ class CountingSemaphore
 {
     private $rclient;
     private $logger;
-    private $name;
-    private $uniqueClientId;
+    private $uniqueJobId;
     private $timeoutSeconds;
-    private $capacity;
     private $acquired;
+    private $resourceName;
+    private $resourceCapacity;
 
-    public function __construct(Predis\Client $rclient, string $resourceName, int $resourceCapacity, string $uniqueJobId, int $timeoutSeconds, Logger $logger = null) 
+    public function __construct(\Predis\Client $rclient, string $resourceName, int $resourceCapacity, string $uniqueJobId, int $timeoutSeconds, \Monolog\Logger $logger = null) 
     {
         $this->rclient = $rclient;
         $this->logger = $logger;
@@ -31,15 +31,15 @@ class CountingSemaphore
         $this->acquired = false;
     
         // register custom lua commands found in RedisCommands.php
-        $rclient->getProfile()->defineCommand('acquiresemaphore', 'RedisAcquireSemaphore');
-        $rclient->getProfile()->defineCommand('refreshsemaphore', 'RedisRefreshSemaphore');
+        $rclient->getProfile()->defineCommand('acquiresemaphore', '\\Mautic\\Library\\RedisLocking\\RedisAcquireSemaphore');
+        $rclient->getProfile()->defineCommand('refreshsemaphore', '\\Mautic\\Library\\RedisLocking\\RedisRefreshSemaphore');
 
         $this->acquire();
     }
 
     public function __destruct()
     {
-        if ($acquired)
+        if ($this->acquired)
         {
             $this->release();
         }
@@ -57,18 +57,48 @@ class CountingSemaphore
             $this->uniqueJobId
         );
 
-        //TODO: check return value
+        if($ret != $this->uniqueJobId) {
+            throw new SemaphoreFullException();
+        }
 
         $this->acquired = true;
     }
 
     public function refresh()
     {
+        $unixTime = time();
 
+        $ret = $this->rclient->refreshsemaphore(
+            $this->resourceName,
+            $this->uniqueJobId,
+            $unixTime
+        );
+
+        if($ret !== 0) {
+            $this->acquired = false;
+            throw new SemaphoreLostException();
+        }
     }
 
     public function release()
     {
-        conn.zrem(semname, identifier)
+        $ret = $this->rclient->zrem($this->resourceName, $this->uniqueJobId);
+        $this->acquired = false;
+
+        if($ret !== 1) {
+            // throw here to point out that the semaphore was lost but the application
+            // clearly did not know (and attempted to release it)
+            throw new SemaphoreLostException();
+        }
+    }
+
+    // Does not check server-side! Returns last known state.
+    public function isAcquired()
+    {
+        return $this->acquired;
+    }
+    public function getJobId()
+    {
+        return $this->uniqueJobId;
     }
 }

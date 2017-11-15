@@ -2,7 +2,7 @@
 
 namespace Mautic\Library\RedisLocking;
 
-class RedisAcquireSemaphore extends Predis\Command\ScriptCommand
+class RedisAcquireSemaphore extends \Predis\Command\ScriptCommand
 {
     public function getKeysCount()
     {
@@ -34,7 +34,7 @@ LUA;
     }
 }
 
-class RedisRefreshSemaphore extends Predis\Command\ScriptCommand
+class RedisRefreshSemaphore extends \Predis\Command\ScriptCommand
 {
     public function getKeysCount()
     {
@@ -53,7 +53,7 @@ class RedisRefreshSemaphore extends Predis\Command\ScriptCommand
          */
         return <<<'LUA'
 if redis.call('zscore', KEYS[1], ARGV[1]) then
-    return redis.call('zadd', KEYS[1], ARGV[2], ARGV[1]) or true
+    return redis.call('zadd', KEYS[1], ARGV[2], ARGV[1])
 end
 LUA;
     }
